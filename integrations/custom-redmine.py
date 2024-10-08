@@ -19,8 +19,8 @@ hook_url = sys.argv[3] + '/issues.json'
 alert_json = json.loads(alert_file.read())
 alert_file.close()
 
-print (sys.argv)
-print (json.dumps(alert_json))
+#print (sys.argv)
+#print (json.dumps(alert_json))
 
 # Extract issue fields
 alert_level = alert_json['rule']['level']
@@ -33,7 +33,7 @@ description = '- Rule ID:' + rule_id + '\n- Agent ID:' + agent_id + '\n- Agent N
 
 # Generate request
 ## Include the API key header
-headers = {'content-type': 'application/json', 'X-Redmine-API-Key': api_key }
+headers = {'Content-type': 'application/json', 'X-Redmine-API-Key': api_key }
 ## Request content
 issue_data = {
     "issue": {
@@ -46,5 +46,10 @@ issue_data = {
     }
     }
 # Send the request
-response = requests.post(hook_url, json=issue_data, headers=headers, verify=False)
+try:
+    response = requests.post(hook_url, json=issue_data, headers=headers, verify=False)
+    #print (response.content.decode('utf-8'))
+except:
+    print ("Error")
+    sys.exit(1)
 sys.exit(0)
