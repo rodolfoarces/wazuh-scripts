@@ -106,7 +106,7 @@ echo "Downloading Yara rules to $RULES_DIR"
 /usr/bin/chown root:wazuh ${RULES_DIR}/yara_rules.yar
 }
 
-set_permissions(){
+set_script(){
 	if [[ ! -f "/var/ossec/active-response/bin/yara.sh" ]];
 	then
 		## Setting yara active response script
@@ -123,20 +123,20 @@ set_permissions(){
 
 ## Using options to manage parameters
 
-while getopts "iau" opt; do
+while getopts "iaus" opt; do
   case $opt in
 	a)
 	  if [ "$INSTALLED" = true ]; then
 		echo "Yara is already installed, proceeding to update rules";
 		update_rules;
-	  	set_permissions;
+	  	set_script;
 	  	echo "Yara installation completed successfully";
 	  else
 		echo "Yara is not installed or wrong version, proceeding to install binary and rules";
 	  	add_prerequisites;
 	  	compile;
 	  	update_rules;
-	  	set_permissions;
+	  	set_script;
 	  	echo "Yara installation completed successfully";
 	  fi
 	  ;;
@@ -148,10 +148,12 @@ while getopts "iau" opt; do
 		add_prerequisites;
 	  	compile;
 	  	update_rules;
-	  	set_permissions;
+	  	set_script;
 	  	echo "Yara installation completed successfully";
-		set_permissions;
-	  	echo "Yara active response script permissions set successfully";
+		;;
+	s)
+		set_script;
+		echo "Yara active response script set successfully";
 		;;
 	\?)
 	  echo "Invalid option: -$OPTARG" >&2

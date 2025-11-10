@@ -93,3 +93,21 @@ Example
 ```
 /bin/bash  /var/ossec/etc/shared/yara_install.sh -i
 ```
+
+### Set the Active Response script
+
+The active response script is necessary to perform analysis
+
+Example:
+```
+/bin/bash  /var/ossec/etc/shared/yara_install.sh -s
+```
+
+Output:
+
+```
+Yara is installed and with the correct version
+Proceeding with options
+Yara active response script already present, skipping download
+Yara active response script set successfully
+```
