@@ -19,10 +19,26 @@ fi
 ## Initial check to run or not
 if [[ -f /usr/local/bin/yara  && "${YARA_VERSION}" == "$(/usr/local/bin/yara --version)" ]];
 then
-        echo "Yara is installed and with the correct version";
-        exit 0;
+	echo "Yara is installed and with the correct version";
+	## No options provided
+	if [ $# -eq 0 ]; then
+		echo -e "No options provided.\nOnly checks performed\nUse -i to force install, -u to update rules, -a to install binary and update rules if necessary.";
+		exit 0;
+	else
+		echo "Proceeding with options";
+		INSTALLED=true
+	fi
+
+else
+	echo "Error, Yara binary is not present or versions don't match"
+	if [ $# -eq 0 ]; then
+		echo -e "No options provided.\nOnly checks performed\nUse -i to force install, -u to update rules, -a to install binary and update rules if necessary."
+  		exit 1;
+	fi
+
 fi
 
+add_prerequisites(){
 # Yara prerequisites
 # automake libtool make gcc pkg-config
 ## Update repositories
@@ -30,7 +46,7 @@ echo "Updating repository information"
 apt-get update
 
 ## Install missing prerequisites
-PACKAGES="automake libtool make gcc pkg-config libssl-dev" # Replace with the actual package name
+PACKAGES="automake libtool make gcc pkg-config libssl-dev" 
 
 for PACKAGE_NAME in $PACKAGES;
 do
@@ -41,15 +57,16 @@ do
 		apt-get install -y  $PACKAGE_NAME;
 	fi
 done
+}
 
+compile(){
 ## Download Yara source code
 /usr/bin/mkdir -p ${TMP_DIR}
-echo "Downloading Yara Source code"/usr/bin/curl --silent -L "https://github.com/VirusTotal/yara/archive/v${YARA_VERSION}.tar.gz" --output "${TMP_DIR}/v${YARA_VERSION}.tar.gz"
- 
+echo "Downloading Yara Source code"
+/usr/bin/curl --silent -L "https://github.com/VirusTotal/yara/archive/v${YARA_VERSION}.tar.gz" --output "${TMP_DIR}/v${YARA_VERSION}.tar.gz"
 
 ## Create directories for compilation
 /usr/bin/mkdir -p ${SRC_DIR}/yara-v${YARA_VERSION}
-
 /usr/bin/tar -zxf "${TMP_DIR}/v${YARA_VERSION}.tar.gz" -C "${SRC_DIR}/yara-v${YARA_VERSION}/" 
 
 ## Compiling
@@ -64,6 +81,14 @@ else
 	exit 2;
 fi
 
+## Cleanup
+echo "Cleaning tmp directory"
+/usr/bin/rm -fR "${TMP_DIR}"
+echo "Cleaning src directory"
+/usr/bin/rm -fR "${SRC_DIR}"
+}
+
+update_rules(){
 ## Creating rules directory
 mkdir -p ${RULES_DIR}
 echo "Downloading Yara rules to $RULES_DIR"
@@ -77,16 +102,59 @@ echo "Downloading Yara rules to $RULES_DIR"
 	--data 'demo=demo&apikey=1111111111111111111111111111111111111111111111111111111111111111&format=text' \
 	-o ${RULES_DIR}/yara_rules.yar
 
-## Setting yara active response script
-echo "Downloading yara active response script"
-/usr/bin/curl --silent -L "https://github.com/rodolfoarces/wazuh-scripts/raw/refs/heads/main/active-response/yara.sh" --output "/var/ossec/active-response/bin/yara.sh" 
+/usr/bin/chmod 644 ${RULES_DIR}/yara_rules.yar
+/usr/bin/chown root:wazuh ${RULES_DIR}/yara_rules.yar
+}
 
-echo "Changing permissions on files"
-/usr/bin/chmod 750 /var/ossec/active-response/bin/yara.sh
-/usr/bin/chown root:wazuh /var/ossec/active-response/bin/yara.sh
+set_permissions(){
+	if [[ ! -f "/var/ossec/active-response/bin/yara.sh" ]];
+	then
+		## Setting yara active response script
+		echo "Downloading yara active response script"
+		/usr/bin/curl --silent -L "https://github.com/rodolfoarces/wazuh-scripts/raw/refs/heads/main/active-response/yara.sh" --output "/var/ossec/active-response/bin/yara.sh" 
+		echo "Changing permissions on files"
+		/usr/bin/chmod 750 /var/ossec/active-response/bin/yara.sh
+		/usr/bin/chown root:wazuh /var/ossec/active-response/bin/yara.sh
+	else
+		echo "Yara active response script already present, skipping download"
+	fi
+}
 
-## Cleanup
-echo "Cleaning tmp directory"
-/usr/bin/rm -fR "${TMP_DIR}"
-echo "Cleaning src directory"
-/usr/bin/rm -fR "${SRC_DIR}"
+
+## Using options to manage parameters
+
+while getopts "iau" opt; do
+  case $opt in
+	a)
+	  if [ "$INSTALLED" = true ]; then
+		echo "Yara is already installed, proceeding to update rules";
+		update_rules;
+	  	set_permissions;
+	  	echo "Yara installation completed successfully";
+	  else
+		echo "Yara is not installed or wrong version, proceeding to install binary and rules";
+	  	add_prerequisites;
+	  	compile;
+	  	update_rules;
+	  	set_permissions;
+	  	echo "Yara installation completed successfully";
+	  fi
+	  ;;
+	u)
+	  update_rules;
+	  echo "Yara rules updated successfully";
+	  ;;
+	i)
+		add_prerequisites;
+	  	compile;
+	  	update_rules;
+	  	set_permissions;
+	  	echo "Yara installation completed successfully";
+		set_permissions;
+	  	echo "Yara active response script permissions set successfully";
+		;;
+	\?)
+	  echo "Invalid option: -$OPTARG" >&2
+	  ;;
+  esac
+done
