@@ -15,6 +15,14 @@ if [ "$EUID" -ne 0 ]; then
 	echo "This script must be run as root or with sudo" 
 	exit 1
 fi
+
+## Initial check to run or not
+if [[ -f /usr/local/bin/yara  && "${YARA_VERSION}" == "$(/usr/local/bin/yara --version)" ]];
+then
+        echo "Yara is installed and with the correct version";
+        exit 0;
+fi
+
 # Yara prerequisites
 # automake libtool make gcc pkg-config
 ## Update repositories
@@ -35,8 +43,9 @@ do
 done
 
 ## Download Yara source code
-echo "Downloading Yara Source code"
-/usr/bin/curl --silent -L "https://github.com/VirusTotal/yara/archive/v${YARA_VERSION}.tar.gz" --output "${TMP_DIR}/v${YARA_VERSION}.tar.gz" 
+/usr/bin/mkdir -p ${TMP_DIR}
+echo "Downloading Yara Source code"/usr/bin/curl --silent -L "https://github.com/VirusTotal/yara/archive/v${YARA_VERSION}.tar.gz" --output "${TMP_DIR}/v${YARA_VERSION}.tar.gz"
+ 
 
 ## Create directories for compilation
 /usr/bin/mkdir -p ${SRC_DIR}/yara-v${YARA_VERSION}
@@ -81,4 +90,3 @@ echo "Cleaning tmp directory"
 /usr/bin/rm -fR "${TMP_DIR}"
 echo "Cleaning src directory"
 /usr/bin/rm -fR "${SRC_DIR}"
-
