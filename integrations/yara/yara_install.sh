@@ -111,7 +111,7 @@ set_script(){
 	then
 		## Setting yara active response script
 		echo "Downloading yara active response script"
-		/usr/bin/curl --silent -L "https://github.com/rodolfoarces/wazuh-scripts/raw/refs/heads/main/active-response/yara.sh" --output "/var/ossec/active-response/bin/yara.sh" 
+		/usr/bin/curl --silent -L "https://github.com/rodolfoarces/wazuh-scripts/raw/refs/heads/main/active-response/yara/yara.sh" --output "/var/ossec/active-response/bin/yara.sh" 
 		echo "Changing permissions on files"
 		/usr/bin/chmod 750 /var/ossec/active-response/bin/yara.sh
 		/usr/bin/chown root:wazuh /var/ossec/active-response/bin/yara.sh
