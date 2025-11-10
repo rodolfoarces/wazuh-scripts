@@ -30,7 +30,7 @@ echo "Updating repository information"
 apt-get update
 
 ## Install missing prerequisites
-PACKAGES="automake libtool make gcc pkg-config" # Replace with the actual package name
+PACKAGES="automake libtool make gcc pkg-config libssl-dev" # Replace with the actual package name
 
 for PACKAGE_NAME in $PACKAGES;
 do
