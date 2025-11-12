@@ -46,7 +46,7 @@ echo "Updating repository information"
 apt-get update
 
 ## Install missing prerequisites
-PACKAGES="automake libtool make gcc pkg-config libssl-dev" 
+PACKAGES="automake libtool make gcc pkg-config libssl-dev jq" 
 
 for PACKAGE_NAME in $PACKAGES;
 do
