@@ -43,18 +43,18 @@ add_prerequisites(){
 # automake libtool make gcc pkg-config
 ## Update repositories
 echo "Updating repository information"
-apt-get update
+/usr/bin/apt-get update
 
 ## Install missing prerequisites
 PACKAGES="automake libtool make gcc pkg-config libssl-dev jq" 
 
 for PACKAGE_NAME in $PACKAGES;
 do
-	if dpkg -s "$PACKAGE_NAME" &> /dev/null; then
+	if /usr/bin/dpkg -s "$PACKAGE_NAME" &> /dev/null; then
  		echo "$PACKAGE_NAME is installed."
 	else
 	      	echo "$PACKAGE_NAME is not installed. Installing.. "
-		apt-get install -y  $PACKAGE_NAME;
+		/usr/bin/apt-get install -y  $PACKAGE_NAME;
 	fi
 done
 }
@@ -90,7 +90,7 @@ echo "Cleaning src directory"
 
 update_rules(){
 ## Creating rules directory
-mkdir -p ${RULES_DIR}
+/usr/bin/mkdir -p ${RULES_DIR} && /usr/bin/chmod 755 ${RULES_DIR}
 echo "Downloading Yara rules to $RULES_DIR"
 /usr/bin/curl --silent 'https://valhalla.nextron-systems.com/api/v1/get' \
 	-H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
@@ -103,7 +103,7 @@ echo "Downloading Yara rules to $RULES_DIR"
 	-o ${RULES_DIR}/yara_rules.yar
 
 /usr/bin/chmod 644 ${RULES_DIR}/yara_rules.yar
-/usr/bin/chown root:wazuh ${RULES_DIR}/yara_rules.yar
+/usr/bin/chown root:wazuh -R ${RULES_DIR}
 }
 
 set_script(){
