@@ -53,54 +53,75 @@ download_file() {
 }
 
 ##############################################
-# 2) Update the artifacts manifest
+# 2-4) Fetch manifest and download packages
+#      Try nightly first; on any failure fall back to nightly-backup
 ##############################################
-ARTIFACTS_URL="https://packages-staging.xdrsiem.wazuh.info/nightly-backup/artifact_urls_5.0.0-latest.yaml"
+NIGHTLY_URL="https://packages-staging.xdrsiem.wazuh.info/nightly/5.0.0/artifact-urls/artifact_urls_5.0.0-latest.yaml"
+NIGHTLY_BACKUP_URL="https://packages-staging.xdrsiem.wazuh.info/nightly-backup/artifact_urls_5.0.0-latest.yaml"
 ARTIFACTS_YAML="artifact_urls_5.0.0-latest.yaml"
-
-echo "[INFO] Updating artifacts manifest from $ARTIFACTS_URL ..."
-download_file "$ARTIFACTS_URL" "${ARTIFACTS_YAML}.tmp"
-mv "${ARTIFACTS_YAML}.tmp" "$ARTIFACTS_YAML"
 
 get_artifact_url() {
     local key=$1
     grep "^${key}:" "$ARTIFACTS_YAML" | sed -E 's/^[^:]+:[[:space:]]*"([^"]+)"/\1/'
 }
 
-##############################################
-# 3) Resolve package URLs from the manifest
-##############################################
-INDEXER_URL=$(get_artifact_url "wazuh_indexer_${ARCH}_${PKG_TYPE}")
-MANAGER_URL=$(get_artifact_url "wazuh_manager_${ARCH}_${PKG_TYPE}")
-DASHBOARD_URL=$(get_artifact_url "wazuh_dashboard_${ARCH}_${PKG_TYPE}")
+# Returns non-zero if the manifest, any entry, or any package download fails.
+fetch_from_source() {
+    local source_name=$1
+    local manifest_url=$2
 
-for pair in "wazuh-indexer:$INDEXER_URL" "wazuh-manager:$MANAGER_URL" "wazuh-dashboard:$DASHBOARD_URL"; do
-    name="${pair%%:*}"
-    url="${pair#*:}"
-    if [ -z "$url" ]; then
-        echo "[ERROR] No manifest entry found for $name (arch=${ARCH}, pkg_type=${PKG_TYPE})."
-        exit 1
+    echo "[INFO] Trying $source_name: $manifest_url"
+
+    if ! download_file "$manifest_url" "${ARTIFACTS_YAML}.tmp"; then
+        echo "[WARN] Could not download manifest from $source_name."
+        rm -f "${ARTIFACTS_YAML}.tmp"
+        return 1
     fi
-done
+    mv "${ARTIFACTS_YAML}.tmp" "$ARTIFACTS_YAML"
 
-INDEXER_PKG=$(basename "$INDEXER_URL")
-MANAGER_PKG=$(basename "$MANAGER_URL")
-DASHBOARD_PKG=$(basename "$DASHBOARD_URL")
+    INDEXER_URL=$(get_artifact_url "wazuh_indexer_${ARCH}_${PKG_TYPE}")
+    MANAGER_URL=$(get_artifact_url "wazuh_manager_${ARCH}_${PKG_TYPE}")
+    DASHBOARD_URL=$(get_artifact_url "wazuh_dashboard_${ARCH}_${PKG_TYPE}")
 
-echo "[INFO] Packages to download:"
-echo "  $INDEXER_PKG"
-echo "  $MANAGER_PKG"
-echo "  $DASHBOARD_PKG"
+    local pair name url pkg
+    for pair in "wazuh-indexer:$INDEXER_URL" "wazuh-manager:$MANAGER_URL" "wazuh-dashboard:$DASHBOARD_URL"; do
+        name="${pair%%:*}"
+        url="${pair#*:}"
+        if [ -z "$url" ] || [ "$url" = "null" ]; then
+            echo "[WARN] No manifest entry for $name in $source_name (arch=${ARCH}, pkg_type=${PKG_TYPE})."
+            return 1
+        fi
+    done
 
-##############################################
-# 4) Download latest packages
-##############################################
-for pair in "$INDEXER_PKG:$INDEXER_URL" "$MANAGER_PKG:$MANAGER_URL" "$DASHBOARD_PKG:$DASHBOARD_URL"; do
-    pkg="${pair%%:*}"
-    url="${pair#*:}"
-    echo "[INFO] Downloading $pkg ..."
-    download_file "$url" "$pkg"
-done
+    INDEXER_PKG=$(basename "$INDEXER_URL")
+    MANAGER_PKG=$(basename "$MANAGER_URL")
+    DASHBOARD_PKG=$(basename "$DASHBOARD_URL")
+
+    echo "[INFO] Packages to download from $source_name:"
+    echo "  $INDEXER_PKG"
+    echo "  $MANAGER_PKG"
+    echo "  $DASHBOARD_PKG"
+
+    for pair in "$INDEXER_PKG:$INDEXER_URL" "$MANAGER_PKG:$MANAGER_URL" "$DASHBOARD_PKG:$DASHBOARD_URL"; do
+        pkg="${pair%%:*}"
+        url="${pair#*:}"
+        echo "[INFO] Downloading $pkg ..."
+        if ! download_file "$url" "$pkg"; then
+            echo "[WARN] Failed to download $pkg from $source_name."
+            rm -f "$INDEXER_PKG" "$MANAGER_PKG" "$DASHBOARD_PKG"
+            return 1
+        fi
+    done
+}
+
+if fetch_from_source "nightly" "$NIGHTLY_URL"; then
+    echo "[INFO] Using nightly artifacts."
+elif fetch_from_source "nightly-backup" "$NIGHTLY_BACKUP_URL"; then
+    echo "[INFO] Nightly failed, using nightly-backup artifacts."
+else
+    echo "[ERROR] Could not fetch artifacts from nightly or nightly-backup."
+    exit 1
+fi
 
 ##############################################
 # 5) Interactive install/uninstall function
