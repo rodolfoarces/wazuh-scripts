@@ -65,19 +65,10 @@ get_artifact_url() {
     grep "^${key}:" "$ARTIFACTS_YAML" | sed -E 's/^[^:]+:[[:space:]]*"([^"]+)"/\1/'
 }
 
-# Returns non-zero if the manifest, any entry, or any package download fails.
-fetch_from_source() {
+# Resolves the packages from the local manifest and downloads them.
+# Returns non-zero if any entry is missing or any package download fails.
+download_packages() {
     local source_name=$1
-    local manifest_url=$2
-
-    echo "[INFO] Trying $source_name: $manifest_url"
-
-    if ! download_file "$manifest_url" "${ARTIFACTS_YAML}.tmp"; then
-        echo "[WARN] Could not download manifest from $source_name."
-        rm -f "${ARTIFACTS_YAML}.tmp"
-        return 1
-    fi
-    mv "${ARTIFACTS_YAML}.tmp" "$ARTIFACTS_YAML"
 
     INDEXER_URL=$(get_artifact_url "wazuh_indexer_${ARCH}_${PKG_TYPE}")
     MANAGER_URL=$(get_artifact_url "wazuh_manager_${ARCH}_${PKG_TYPE}")
@@ -114,7 +105,31 @@ fetch_from_source() {
     done
 }
 
-if fetch_from_source "nightly" "$NIGHTLY_URL"; then
+# Returns non-zero if the manifest download or any package download fails.
+fetch_from_source() {
+    local source_name=$1
+    local manifest_url=$2
+
+    echo "[INFO] Trying $source_name: $manifest_url"
+
+    if ! download_file "$manifest_url" "${ARTIFACTS_YAML}.tmp"; then
+        echo "[WARN] Could not download manifest from $source_name."
+        rm -f "${ARTIFACTS_YAML}.tmp"
+        return 1
+    fi
+    mv "${ARTIFACTS_YAML}.tmp" "$ARTIFACTS_YAML"
+
+    download_packages "$source_name"
+}
+
+if [ -f "$ARTIFACTS_YAML" ]; then
+    echo "[INFO] $ARTIFACTS_YAML already exists, skipping manifest download."
+    if ! download_packages "local manifest"; then
+        echo "[ERROR] Could not download packages from the existing $ARTIFACTS_YAML."
+        echo "[ERROR] Remove the file to fetch a fresh manifest from nightly/nightly-backup."
+        exit 1
+    fi
+elif fetch_from_source "nightly" "$NIGHTLY_URL"; then
     echo "[INFO] Using nightly artifacts."
 elif fetch_from_source "nightly-backup" "$NIGHTLY_BACKUP_URL"; then
     echo "[INFO] Nightly failed, using nightly-backup artifacts."
